@@ -1,56 +1,74 @@
 #include <Arduino.h>
-//based on:
-// Adafruit Adafruit_BME280_Library
-// https://github.com/adafruit/Adafruit_BME280_Library
-//and
-// Astuder BMP085-template-library-Energia
-// https://github.com/astuder/BMP085-template-library-Energia
-//plus code for altitude and relative pressure
-//by r7
+/*********
+  Complete project details at https://randomnerdtutorials.com  
+*********/
 
-#include <Wire.h>                                                       // required by BME280 library
-#include <BME280_t.h>                                                   // import BME280 template library
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
 
-#define ASCII_ESC 27
+/*#include <SPI.h>
+#define BME_SCK 18
+#define BME_MISO 19
+#define BME_MOSI 23
+#define BME_CS 5*/
 
-#define MYALTITUDE  150.50
+#define SEALEVELPRESSURE_HPA (1013.25)
 
-char bufout[10];
+Adafruit_BME280 bme; // I2C
+//Adafruit_BME280 bme(BME_CS); // hardware SPI
+//Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO, BME_SCK); // software SPI
 
-BME280<> BMESensor;                                                     // instantiate sensor
+unsigned long delayTime;
 
-void setup()
-{
-  Serial.begin(115200);                                                 // initialize serial
-  Wire.begin(0,2);                                                      // initialize I2C that connects to sensor
-  BMESensor.begin();                                                    // initalize bme280 sensor
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println(F("BME280 test"));
+
+  bool status;
+
+  // default settings
+  // (you can also pass in a Wire library object like &Wire2)
+  status = bme.begin(0x76);  
+  if (!status) {
+    Serial.println("Could not find a valid BME280 sensor, check wiring!");
+    while (1);
+  }
+
+  Serial.println("-- Default Test --");
+  delayTime = 1000;
+
+  Serial.println();
+}
+void printValues() {
+  Serial.print("Temperature = ");
+  Serial.print(bme.readTemperature());
+  Serial.println(" *C");
+  
+  // Convert temperature to Fahrenheit
+  /*Serial.print("Temperature = ");
+  Serial.print(1.8 * bme.readTemperature() + 32);
+  Serial.println(" *F");*/
+  
+  Serial.print("Pressure = ");
+  Serial.print(bme.readPressure() / 100.0F);
+  Serial.println(" hPa");
+
+  Serial.print("Approx. Altitude = ");
+  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
+  Serial.println(" m");
+
+  Serial.print("Humidity = ");
+  Serial.print(bme.readHumidity());
+  Serial.println(" %");
+
+  Serial.println();
 }
 
-void loop() {
-  BMESensor.refresh();                                                  // read current sensor data
-  sprintf(bufout,"%c[1;0H",ASCII_ESC);
-  Serial.print(bufout);
 
-  Serial.print("Temperature: ");
-  Serial.print(BMESensor.temperature);                                  // display temperature in Celsius
-  Serial.println("C");
-
-  Serial.print("Humidity:    ");
-  Serial.print(BMESensor.humidity);                                     // display humidity in %
-  Serial.println("%");
-
-  Serial.print("Pressure:    ");
-  Serial.print(BMESensor.pressure  / 100.0F);                           // display pressure in hPa
-  Serial.println("hPa");
-
-  float relativepressure = BMESensor.seaLevelForAltitude(MYALTITUDE);
-  Serial.print("RelPress:    ");
-  Serial.print(relativepressure  / 100.0F);                             // display relative pressure in hPa for given altitude
-  Serial.println("hPa");
-
-  Serial.print("Altitude:    ");
-  Serial.print(BMESensor.pressureToAltitude(relativepressure));         // display altitude in m for given pressure
-  Serial.println("m");
-
-  delay(1000);                                                          // wait a while before next loop
+void loop() { 
+  printValues();
+  delay(delayTime);
 }
+
