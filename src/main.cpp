@@ -1,19 +1,29 @@
 #include <Arduino.h>
-/*********
-  Complete project details at https://randomnerdtutorials.com  
-*********/
-
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
+#include <WiFi.h>
+#include <MySQL_Connection.h>
+#include <MySQL_Cursor.h>
 
-/*#include <SPI.h>
-#define BME_SCK 18
-#define BME_MISO 19
-#define BME_MOSI 23
-#define BME_CS 5*/
 
 #define SEALEVELPRESSURE_HPA (1013.25)
+
+IPAddress server_addr(192,168,0,2);  // IP of the MySQL *server* here
+char user[] = "test1";              // MySQL user login username
+char password[] = "password";        // MySQL user login password
+
+// Sample query
+char INSERT_SQL[] = "INSERT INTO weather test 1.weatherdata (location, Temperature, Pressure, Humidity) VALUES (%d,%f,%f,%f)";
+char query[128];
+
+// WiFi card example
+char ssid[] = "Vanilla wireless";         // your SSID
+char pass[] = "vanillataste";     // your SSID Password
+
+WiFiClient client;             // Use this for WiFi instead of EthernetClient
+MySQL_Connection conn(&client);
+MySQL_Cursor* cursor;
 
 Adafruit_BME280 bme; // I2C
 //Adafruit_BME280 bme(BME_CS); // hardware SPI
@@ -21,9 +31,35 @@ Adafruit_BME280 bme; // I2C
 
 unsigned long delayTime;
 
+float currentTemperature;
+float currentPressure;
+float currentHumidity;
+
 
 void setup() {
   Serial.begin(115200);
+
+  // Begin WiFi section
+  Serial.printf("\nConnecting to %s", ssid);
+  WiFi.begin(ssid, pass);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+    // print out info about the connection:
+  Serial.println("\nConnected to network");
+  Serial.print("My IP address is: ");
+  Serial.println(WiFi.localIP());
+
+  Serial.print("Connecting to SQL...  ");
+  if (conn.connect(server_addr, 3306, user, password))
+    Serial.println("OK.");
+  else
+    Serial.println("FAILED.");
+  
+  // create MySQL cursor object
+  cursor = new MySQL_Cursor(&conn);
   Serial.println(F("BME280 test"));
 
   bool status;
@@ -43,7 +79,8 @@ void setup() {
 }
 void printValues() {
   Serial.print("Temperature = ");
-  Serial.print(bme.readTemperature());
+  currentTemperature = bme.readTemperature();
+  Serial.print(currentTemperature);
   Serial.println(" *C");
   
   // Convert temperature to Fahrenhei
@@ -52,15 +89,13 @@ void printValues() {
   Serial.println(" *F");*/
   
   Serial.print("Pressure = ");
-  Serial.print(bme.readPressure() / 100.0F);
+  currentPressure = bme.readPressure() / 100.0F;
+  Serial.print(currentPressure);
   Serial.println(" hPa");
 
-  Serial.print("Approx. Altitude = ");
-  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
-  Serial.println(" m");
-
   Serial.print("Humidity = ");
-  Serial.print(bme.readHumidity());
+  currentHumidity = bme.readHumidity();
+  Serial.print(currentHumidity);
   Serial.println(" %");
 
   Serial.println();
@@ -69,6 +104,9 @@ void printValues() {
 
 void loop() { 
   printValues();
+  if (conn.connected())
+    sprintf(query,INSERT_SQL,1, currentTemperature, currentPressure, currentHumidity);
+    cursor->execute(query);
   delay(delayTime);
 }
 
