@@ -9,12 +9,12 @@
 
 #define SEALEVELPRESSURE_HPA (1013.25)
 
-IPAddress server_addr(192,168,0,2);  // IP of the MySQL *server* here
-char user[] = "test1";              // MySQL user login username
+IPAddress server_addr(192,168,0,25);  // IP of the MySQL *server* here
+char user[] = "test";              // MySQL user login username
 char password[] = "password";        // MySQL user login password
 
 // Sample query
-char INSERT_SQL[] = "INSERT INTO weather test 1.weatherdata (location, Temperature, Pressure, Humidity) VALUES (%d,%f,%f,%f)";
+char INSERT_SQL[] = "INSERT INTO weathertest1.weatherdata (location, Temperature, Pressure, Humidity) VALUES (%d,%f,%f,%f)";
 char query[128];
 
 // WiFi card example
@@ -46,11 +46,29 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
+  
+  
 
     // print out info about the connection:
   Serial.println("\nConnected to network");
   Serial.print("My IP address is: ");
   Serial.println(WiFi.localIP());
+  delay(5000);
+  //client.flush();
+  Serial.println(WiFi.status());
+  Serial.println(WiFi.networkID());
+  Serial.println(WiFi.SSID());
+  Serial.println(WiFi.RSSI());
+  Serial.println(WiFi.isConnected());
+
+  delay(5000);
+
+for(int i = 0; i < 5 && WiFi.status() != WL_CONNECTED; i++) {
+      Serial.print(".");
+      delay(1000);
+  }
+  
+  
 
   Serial.print("Connecting to SQL...  ");
   if (conn.connect(server_addr, 3306, user, password))
@@ -73,7 +91,7 @@ void setup() {
   }
 
   Serial.println("-- Default Test --");
-  delayTime = 1000;
+  delayTime = 5000;
 
   Serial.println();
 }
