@@ -6,15 +6,21 @@
 #include <MySQL_Connection.h>
 #include <MySQL_Cursor.h>
 
+#define SLEEP_TIME 6000000
+#define SQL_LED 19
+#define WIFI_LED 18
+#define ERROR_LED 2
 
-#define SEALEVELPRESSURE_HPA (1013.25)
+int lastErrorCause = 0;
+bool wifiBlink = true;
+
 
 IPAddress server_addr(192,168,0,25);  // IP of the MySQL *server* here
 char user[] = "test";              // MySQL user login username
 char password[] = "password";        // MySQL user login password
 
 // Sample query
-char INSERT_SQL[] = "INSERT INTO weathertest1.weatherdata (location, Temperature, Pressure, Humidity) VALUES (%d,%f,%f,%f)";
+char INSERT_SQL[] = "INSERT INTO weathertest1.weatherData (location, Temperature, Pressure, Humidity) VALUES (%d,%f,%f,%f)";
 char query[128];
 
 // WiFi card example
@@ -29,7 +35,7 @@ Adafruit_BME280 bme; // I2C
 //Adafruit_BME280 bme(BME_CS); // hardware SPI
 //Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO, BME_SCK); // software SPI
 
-unsigned long delayTime;
+//unsigned long delayTime;
 
 float currentTemperature;
 float currentPressure;
@@ -39,42 +45,37 @@ float currentHumidity;
 void setup() {
   Serial.begin(115200);
 
+  pinMode(WIFI_LED,OUTPUT);
+  pinMode(SQL_LED,OUTPUT);
+  pinMode(ERROR_LED, OUTPUT);
+  digitalWrite(WIFI_LED, LOW);
+  digitalWrite(SQL_LED, LOW);
+  digitalWrite(ERROR_LED, LOW);
+
   // Begin WiFi section
-  Serial.printf("\nConnecting to %s", ssid);
   WiFi.begin(ssid, pass);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
+    if (wifiBlink){digitalWrite(ERROR_LED, LOW);}
+    else{digitalWrite(ERROR_LED, HIGH);}
+    wifiBlink = !wifiBlink;
+    //WiFi.reconnect();
+    }
+  digitalWrite(ERROR_LED, LOW);
+  if (WiFi.status()!= WL_CONNECTED){
+    lastErrorCause = 1;
   }
-  
-  
 
-    // print out info about the connection:
-  Serial.println("\nConnected to network");
-  Serial.print("My IP address is: ");
-  Serial.println(WiFi.localIP());
-  delay(5000);
-  //client.flush();
-  Serial.println(WiFi.status());
-  Serial.println(WiFi.networkID());
-  Serial.println(WiFi.SSID());
-  Serial.println(WiFi.RSSI());
-  Serial.println(WiFi.isConnected());
+  esp_sleep_enable_timer_wakeup(SLEEP_TIME);
 
-  delay(5000);
-
-for(int i = 0; i < 5 && WiFi.status() != WL_CONNECTED; i++) {
-      Serial.print(".");
-      delay(1000);
+ 
+  if (conn.connect(server_addr, 3306, user, password)){
+    
   }
-  
-  
-
-  Serial.print("Connecting to SQL...  ");
-  if (conn.connect(server_addr, 3306, user, password))
-    Serial.println("OK.");
-  else
-    Serial.println("FAILED.");
+  else {
+    //digitalWrite(ERROR_LED, HIGH);
+    lastErrorCause = 2;
+  }
   
   // create MySQL cursor object
   cursor = new MySQL_Cursor(&conn);
@@ -82,49 +83,91 @@ for(int i = 0; i < 5 && WiFi.status() != WL_CONNECTED; i++) {
 
   bool status;
 
-  // default settings
-  // (you can also pass in a Wire library object like &Wire2)
   status = bme.begin(0x76);  
   if (!status) {
-    Serial.println("Could not find a valid BME280 sensor, check wiring!");
-    while (1);
-  }
-
-  Serial.println("-- Default Test --");
-  delayTime = 5000;
-
-  Serial.println();
+    //digitalWrite(ERROR_LED, HIGH);
+    lastErrorCause = 3;
+    Serial.println(lastErrorCause);
+    Serial.println(status); 
+    }
 }
-void printValues() {
-  Serial.print("Temperature = ");
+void readValues() {
+  //Serial.print("Temperature = ");
   currentTemperature = bme.readTemperature();
-  Serial.print(currentTemperature);
-  Serial.println(" *C");
+  //Serial.print(currentTemperature);
+  //Serial.println(" *C");
   
-  // Convert temperature to Fahrenhei
-  /*Serial.print("Temperature = ");
-  Serial.print(1.8 * bme.readTemperature() + 32);
-  Serial.println(" *F");*/
-  
-  Serial.print("Pressure = ");
+  //Serial.print("Pressure = ");
   currentPressure = bme.readPressure() / 100.0F;
-  Serial.print(currentPressure);
-  Serial.println(" hPa");
+  //Serial.print(currentPressure);
+  //Serial.println(" hPa");
 
-  Serial.print("Humidity = ");
+  //Serial.print("Humidity = ");
   currentHumidity = bme.readHumidity();
-  Serial.print(currentHumidity);
-  Serial.println(" %");
+  //Serial.print(currentHumidity);
+  //Serial.println(" %");
 
-  Serial.println();
+  //Serial.println();
 }
 
 
 void loop() { 
-  printValues();
-  if (conn.connected())
+  readValues();
+  if (conn.connected() && lastErrorCause == 0){
     sprintf(query,INSERT_SQL,1, currentTemperature, currentPressure, currentHumidity);
     cursor->execute(query);
-  delay(delayTime);
+    digitalWrite(WIFI_LED, HIGH);
+    delay(100);
+    digitalWrite(WIFI_LED, LOW);
+  }
+  else{
+    //error cases here.
+    //digitalWrite(ERROR_LED, HIGH);
+
+    switch (lastErrorCause)
+    {  
+    case 1:
+      digitalWrite(ERROR_LED,HIGH);
+      delay(500);
+      digitalWrite(ERROR_LED,LOW);
+      break;
+    case 2:
+      digitalWrite(ERROR_LED,HIGH);
+      delay(500);
+      digitalWrite(ERROR_LED,LOW);
+      delay(500);
+      digitalWrite(ERROR_LED,HIGH);
+      delay(500);
+      digitalWrite(ERROR_LED,LOW);
+      break;
+    case 3:
+      digitalWrite(ERROR_LED,HIGH);
+      delay(500);
+      digitalWrite(ERROR_LED,LOW);
+      delay(500);
+      digitalWrite(ERROR_LED,HIGH);
+      delay(500);
+      digitalWrite(ERROR_LED,LOW);
+      delay(500);     
+      digitalWrite(ERROR_LED,HIGH);
+      delay(500);
+      digitalWrite(ERROR_LED,LOW);
+      break;
+    
+    default:
+      while(true){
+        delay(100);
+        digitalWrite(ERROR_LED,HIGH);
+        delay(100);
+        digitalWrite(ERROR_LED,LOW);
+      }
+      break;
+    }
+
+  }
+  Serial.println("going sleep");
+  digitalWrite(WIFI_LED, LOW);
+  digitalWrite(SQL_LED, LOW);
+  esp_deep_sleep_start();
 }
 
